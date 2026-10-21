@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D-benchmark</title>
+  <style>
+    :root {
+      --bg: #050b16;
+      --panel: rgba(15, 23, 42, 0.88);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      background: #020712;
+      cursor: default;
+    }
+
+    .hud {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      width: min(460px, calc(100vw - 32px));
+      background: var(--panel);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 14px;
+      padding: 16px;
+      z-index: 50;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+    }
+
+    .title {
+      margin: 0 0 12px;
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .stat {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 0.68rem;
+      margin-bottom: 4px;
+    }
+
+    .value {
+      font-size: 1.22rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .preset-btn {
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(15, 23, 42, 0.8);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 6px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+
+    .preset-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(96, 165, 250, 0.8);
+    }
+
+    .preset-btn.active {
+      background: linear-gradient(180deg, rgba(37, 99, 235, 0.9), rgba(29, 78, 216, 0.95));
+      border-color: rgba(96, 165, 250, 1);
+    }
+
+    .sliderWrap {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #60a5fa;
+    }
+
+    .countValue, .timeValue {
+      min-width: 95px;
+      text-align: right;
+      font-weight: 700;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      border: none;
+      outline: none;
+      background: linear-gradient(180deg, #2563eb, #1d4ed8);
+      color: white;
+      font-weight: 800;
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: transform 0.12s ease, filter 0.12s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+
+    button.secondary {
+      background: linear-gradient(180deg, #475569, #334155);
+    }
+
+    .status {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .status strong {
+      color: var(--text);
+    }
+
+    .summary-screen {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 7, 18, 0.8);
+      display: none;
+      place-items: center;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+
+    .summary-card {
+      width: min(520px, calc(100vw - 32px));
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+    }
+
+    .summary-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .summary-box {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .summary-label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 0.68rem;
+      margin-bottom: 4px;
+    }
+
+    .summary-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .summary-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 600px) {
+      .presets {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <div class="title">Ultra Dense Benchmark</div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="label">FPS</div>
+        <div class="value" id="fpsValue">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Frame</div>
+        <div class="value" id="frameValue">0 ms</div>
+      </div>
+      <div class="stat">
+        <div class="label">Avg FPS</div>
+        <div class="value" id="avgFpsValue">--</div>
+      </div>
+      <div class="stat">
+        <div class="label">Objects</div>
+        <div class="value" id="objectValue">0</div>
+      </div>
+    </div>
+
+    <div class="presets" id="presetButtons">
+      <button class="preset-btn active" data-count="50000">Low</button>
+      <button class="preset-btn" data-count="150000">Med</button>
+      <button class="preset-btn" data-count="400000">High</button>
+      <button class="preset-btn" data-count="800000">Ultra</button>
+      <button class="preset-btn" data-count="1000000">1M</button>
+      <button class="preset-btn" data-count="1500000">1.5M</button>
+      <button class="preset-btn" data-count="2000000">2M</button>
+      <button class="preset-btn" data-count="10000000">10M</button>
+    </div>
+
+    <div class="sliderWrap">
+      <div class="row">
+        <span class="label" style="margin:0; color: var(--text); font-size: 0.72rem;">Object Count</span>
+        <span id="countDisplay" class="countValue">50,000</span>
+      </div>
+      <input id="objectSlider" type="range" min="50000" max="10000000" step="50000" value="50000" />
+    </div>
+
+    <div class="sliderWrap">
+      <div class="row">
+        <span class="label" style="margin:0; color: var(--text); font-size: 0.72rem;">Benchmark Time</span>
+        <span id="durationDisplay" class="timeValue">5.0 s</span>
+      </div>
+      <input id="durationSlider" type="range" min="2000" max="30000" step="500" value="5000" />
+    </div>
+
+    <div class="controls">
+      <button id="toggleBtn">Start Benchmark</button>
+      <button id="resetBtn" class="secondary">Reset</button>
+    </div>
+
+    <div class="status">
+      Status: <strong id="statusText">Idle</strong>
+    </div>
+  </div>
+
+  <div class="summary-screen" id="summaryScreen">
+    <div class="summary-card">
+      <div class="summary-title">Benchmark Summary</div>
+
+      <div class="summary-grid">
+        <div class="summary-box">
+          <div class="summary-label">Avg FPS</div>
+          <div class="summary-value" id="summaryAvgFps">0</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-label">Min FPS</div>
+          <div class="summary-value" id="summaryMinFps">0</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-label">Max FPS</div>
+          <div class="summary-value" id="summaryMaxFps">0</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-label">Objects</div>
+          <div class="summary-value" id="summaryObjects">0</div>
+        </div>
+        <div class="summary-box" style="grid-column: 1 / -1;">
+          <div class="summary-label">Benchmark Runtime</div>
+          <div class="summary-value" id="summaryRuntime">0.00 s</div>
+        </div>
+      </div>
+
+      <div class="summary-actions">
+        <button id="closeSummary">Close</button>
+        <button id="rerunSummary" class="secondary">Run Again</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js";
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050b16);
+    scene.fog = new THREE.Fog(0x050b16, 20, 260);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1500);
+    camera.position.set(0, 8, 36);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.body.appendChild(renderer.domElement);
+
+    const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x07111d, 1.5);
+    scene.add(hemi);
+
+    const dir = new THREE.DirectionalLight(0xffffff, 1.9);
+    dir.position.set(18, 24, 12);
+    scene.add(dir);
+
+    const rim = new THREE.PointLight(0x60a5fa, 60, 200, 2);
+    rim.position.set(-18, 10, -20);
+    scene.add(rim);
+
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(52, 128),
+      new THREE.MeshStandardMaterial({
+        color: 0x101827,
+        roughness: 0.96,
+        metalness: 0.0
+      })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -18;
+    scene.add(ground);
+
+    const objectSlider = document.getElementById("objectSlider");
+    const countDisplay = document.getElementById("countDisplay");
+    const objectValueEl = document.getElementById("objectValue");
+    const fpsValueEl = document.getElementById("fpsValue");
+    const frameValueEl = document.getElementById("frameValue");
+    const avgFpsValueEl = document.getElementById("avgFpsValue");
+    const statusTextEl = document.getElementById("statusText");
+    const toggleBtn = document.getElementById("toggleBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const presetButtons = document.querySelectorAll(".preset-btn");
+    const durationSlider = document.getElementById("durationSlider");
+    const durationDisplay = document.getElementById("durationDisplay");
+
+    const summaryScreen = document.getElementById("summaryScreen");
+    const summaryAvgFps = document.getElementById("summaryAvgFps");
+    const summaryMinFps = document.getElementById("summaryMinFps");
+    const summaryMaxFps = document.getElementById("summaryMaxFps");
+    const summaryObjects = document.getElementById("summaryObjects");
+    const summaryRuntime = document.getElementById("summaryRuntime");
+    const closeSummary = document.getElementById("closeSummary");
+    const rerunSummary = document.getElementById("rerunSummary");
+
+    const MAX_FPS_DISPLAY = 400;
+    const WARMUP_MS = 750;
+
+    let objectCount = Number(objectSlider.value);
+    let benchmarkDurationMs = Number(durationSlider.value);
+
+    let currentMesh = null;
+    let dummy = new THREE.Object3D();
+
+    function clampDisplay(value) {
+      return Math.min(MAX_FPS_DISPLAY, Math.max(0, value));
+    }
+
+    function updateHudCount() {
+      const count = Number(objectSlider.value);
+      countDisplay.textContent = count.toLocaleString();
+      objectValueEl.textContent = count.toLocaleString();
+    }
+
+    function updateDurationDisplay() {
+      benchmarkDurationMs = Number(durationSlider.value);
+      const seconds = benchmarkDurationMs / 1000;
+      durationDisplay.textContent = `${seconds.toFixed(1)} s`;
+    }
+
+    function setActivePreset(value) {
+      presetButtons.forEach((btn) => {
+        btn.classList.toggle("active", Number(btn.dataset.count) === value);
+      });
+    }
+
+    function buildBenchmark(count) {
+      if (currentMesh) scene.remove(currentMesh);
+
+      const geometry = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x7dd3fc,
+        emissive: 0x1d4ed8,
+        emissiveIntensity: 0.3,
+        roughness: 0.35,
+        metalness: 0.18
+      });
+
+      currentMesh = new THREE.InstancedMesh(geometry, material, count);
+      scene.add(currentMesh);
+      updateHudCount();
+    }
+
+    const state = {
+      running: false,
+      previousTimestamp: 0,
+      elapsedMs: 0,
+      fpsSamples: [],
+      sampleWindow: 60,
+      minFps: Infinity,
+      maxFps: 0
+    };
+
+    function setStatus(text) {
+      statusTextEl.textContent = text;
+    }
+
+    function resetBenchmark() {
+      state.running = false;
+      state.previousTimestamp = 0;
+      state.elapsedMs = 0;
+      state.fpsSamples = [];
+      state.minFps = Infinity;
+      state.maxFps = 0;
+      setStatus("Idle");
+      toggleBtn.textContent = "Start Benchmark";
+      fpsValueEl.textContent = "0";
+      frameValueEl.textContent = "0 ms";
+      avgFpsValueEl.textContent = "--";
+    }
+
+    function startBenchmark() {
+      state.running = true;
+      state.elapsedMs = 0;
+      state.previousTimestamp = performance.now();
+      state.fpsSamples = [];
+      state.minFps = Infinity;
+      state.maxFps = 0;
+      setStatus("Running");
+      toggleBtn.textContent = "Stop Benchmark";
+    }
+
+    function finishBenchmark() {
+      if (state.fpsSamples.length === 0) {
+        summaryAvgFps.textContent = "0.0";
+        summaryMinFps.textContent = "0.0";
+        summaryMaxFps.textContent = "0.0";
+      } else {
+        const avg = state.fpsSamples.reduce((sum, v) => sum + v, 0) / state.fpsSamples.length;
+        const min = Math.min(...state.fpsSamples);
+        const max = Math.max(...state.fpsSamples);
+
+        summaryAvgFps.textContent = clampDisplay(avg).toFixed(1);
+        summaryMinFps.textContent = clampDisplay(min).toFixed(1);
+        summaryMaxFps.textContent = clampDisplay(max).toFixed(1);
+      }
+
+      summaryObjects.textContent = Number(objectSlider.value).toLocaleString();
+      summaryRuntime.textContent = `${(state.elapsedMs / 1000).toFixed(2)} s`;
+      summaryScreen.style.display = "grid";
+    }
+
+    function stopBenchmark() {
+      state.running = false;
+      setStatus("Stopped");
+      toggleBtn.textContent = "Start Benchmark";
+      finishBenchmark();
+    }
+
+    function updateStats(deltaMs, fps, avgFps) {
+      fpsValueEl.textContent = clampDisplay(fps).toFixed(1);
+      frameValueEl.textContent = `${deltaMs.toFixed(2)} ms`;
+      avgFpsValueEl.textContent = avgFps === null ? "--" : clampDisplay(avgFps).toFixed(1);
+    }
+
+    objectSlider.addEventListener("input", () => {
+      objectCount = Number(objectSlider.value);
+      updateHudCount();
+      setActivePreset(objectCount);
+    });
+
+    objectSlider.addEventListener("change", () => {
+      const value = Number(objectSlider.value);
+      buildBenchmark(value);
+      resetBenchmark();
+      setActivePreset(value);
+    });
+
+    presetButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const value = Number(btn.dataset.count);
+        objectSlider.value = String(value);
+        objectCount = value;
+        buildBenchmark(value);
+        resetBenchmark();
+        setActivePreset(value);
+      });
+    });
+
+    durationSlider.addEventListener("input", () => {
+      updateDurationDisplay();
+    });
+
+    toggleBtn.addEventListener("click", () => {
+      if (state.running) stopBenchmark();
+      else startBenchmark();
+    });
+
+    resetBtn.addEventListener("click", () => {
+      buildBenchmark(Number(objectSlider.value));
+      resetBenchmark();
+    });
+
+    closeSummary.addEventListener("click", () => {
+      summaryScreen.style.display = "none";
+    });
+
+    rerunSummary.addEventListener("click", () => {
+      summaryScreen.style.display = "none";
+      buildBenchmark(Number(objectSlider.value));
+      startBenchmark();
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const now = performance.now();
+
+      if (!state.previousTimestamp) {
+        state.previousTimestamp = now;
+      }
+
+      const deltaMs = Math.max(1, now - state.previousTimestamp);
+      state.previousTimestamp = now;
+
+      if (state.running) {
+        state.elapsedMs += deltaMs;
+
+        const t = state.elapsedMs * 0.001;
+
+        if (state.elapsedMs > WARMUP_MS) {
+          const fps = 1000 / deltaMs;
+
+          state.fpsSamples.push(fps);
+          if (state.fpsSamples.length > state.sampleWindow) {
+            state.fpsSamples.shift();
+          }
+
+          state.minFps = Math.min(state.minFps, fps);
+          state.maxFps = Math.max(state.maxFps, fps);
+
+          const avgFps = state.fpsSamples.reduce((sum, v) => sum + v, 0) / state.fpsSamples.length;
+          updateStats(deltaMs, fps, avgFps);
+        } else {
+          updateStats(deltaMs, 0, null);
+        }
+
+        const orbitAngle = (t * 0.85) % (Math.PI * 2);
+        const radius = 27 + Math.sin(t * 0.7) * 2;
+
+        camera.position.x = Math.cos(orbitAngle) * radius;
+        camera.position.z = Math.sin(orbitAngle) * radius;
+        camera.position.y = 8 + Math.sin(t * 1.25) * 4;
+        camera.lookAt(0, 0, 0);
+
+        const count = objectCount;
+        const baseScale = 0.08 + Math.sin(t * 1.8) * 0.02;
+
+        for (let i = 0; i < count; i++) {
+          const slice = i / count;
+          const angle = slice * Math.PI * 2 * 5.5;
+          const ring = 4 + (i % 260) * 0.14;
+          const x = Math.cos(angle) * ring + Math.sin(i * 0.9) * 2.4;
+          const y = ((i % 260) - 130) * 0.16 + Math.sin(t * 0.8 + i * 0.18) * 1.1;
+          const z = Math.sin(angle) * ring + Math.cos(i * 1.1) * 2.4;
+
+          const sway = Math.sin(t * (0.8 + (i % 5) * 0.12) + i * 0.05);
+          const px = x + sway * 0.7;
+          const py = y + Math.cos(t * 0.9 + i * 0.04) * 0.7;
+          const pz = z + Math.sin(t * 1.1 + i * 0.06) * 0.7;
+
+          dummy.position.set(px, py, pz);
+          dummy.rotation.x = t * 0.8 + i * 0.013;
+          dummy.rotation.y = t * 1.3 + i * 0.017;
+          dummy.rotation.z = t * 0.65 + i * 0.021;
+          dummy.scale.setScalar(baseScale * (1.0 + Math.sin(t * 2.3 + i * 0.01) * 0.25));
+          dummy.updateMatrix();
+          currentMesh.setMatrixAt(i, dummy.matrix);
+        }
+
+        currentMesh.instanceMatrix.needsUpdate = true;
+
+        if (state.elapsedMs >= benchmarkDurationMs) {
+          stopBenchmark();
+        }
+      } else {
+        const idleT = now * 0.001;
+        camera.position.x = Math.cos(idleT * 0.7) * 24;
+        camera.position.z = Math.sin(idleT * 0.7) * 24;
+        camera.position.y = 8 + Math.sin(idleT * 1.2) * 2.5;
+        camera.lookAt(0, 0, 0);
+
+        updateStats(deltaMs, 0, null);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    updateDurationDisplay();
+    buildBenchmark(objectCount);
+    setActivePreset(objectCount);
+    resetBenchmark();
+    animate();
+  </script>
+</body>
+</html>
